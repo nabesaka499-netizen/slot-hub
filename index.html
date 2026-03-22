@@ -438,7 +438,7 @@ document.getElementById('searchInput').addEventListener('input', renderCards);
 document.getElementById('btnShare').addEventListener('click', () => {
   try {
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(sites))));
-    const url = `${location.origin}${location.pathname}#import=${encoded}`;
+    const url = `${location.origin}${location.pathname}?import=${encoded}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => toast('共有URLをコピーしました！LINEに貼り付けて送ってください'));
     } else {
@@ -449,10 +449,10 @@ document.getElementById('btnShare').addEventListener('click', () => {
 
 // ---- IMPORT FROM URL ----
 function handleImportFromUrl() {
-  const hash = location.hash;
-  if (!hash.startsWith('#import=')) return;
+  const params = new URLSearchParams(location.search);
+  const encoded = params.get('import');
+  if (!encoded) return;
   try {
-    const encoded = hash.slice('#import='.length);
     const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
     if (!Array.isArray(data)) return;
     history.replaceState(null, '', location.pathname);
@@ -463,7 +463,7 @@ function handleImportFromUrl() {
       renderCards();
       toast(`${data.length}件を読み込みました`);
     }
-  } catch { /* 無効なhashは無視 */ }
+  } catch { /* 無効なパラメータは無視 */ }
 }
 
 // ---- DOWNLOAD ----
