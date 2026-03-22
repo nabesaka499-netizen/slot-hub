@@ -144,13 +144,8 @@
     <div class="form-group">
       <label>カテゴリ</label>
       <select id="fCat">
-        <option value="攻略">攻略</option>
-        <option value="設定判別">設定判別</option>
-        <option value="データ">データ</option>
-        <option value="動画">動画</option>
-        <option value="掲示板">掲示板</option>
-        <option value="ニュース">ニュース</option>
-        <option value="その他">その他</option>
+        <option value="サブスク">サブスク</option>
+        <option value="ノート">ノート</option>
       </select>
     </div>
     <div class="form-group">
@@ -206,8 +201,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 
 // ---- RENDER ----
 function getCategories() {
-  const cats = ['すべて', 'お気に入り', ...new Set(sites.map(s => s.cat))];
-  return cats;
+  return ['すべて', 'お気に入り', 'サブスク', 'ノート'];
 }
 
 function renderTabs() {
