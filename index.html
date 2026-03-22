@@ -132,9 +132,11 @@
 <header>
   <div class="logo">SLOT HUB<span>SITE MANAGER</span></div>
   <div class="actions">
-    <button class="icon-btn" id="btnDownload" title="バックアップ">⬇</button>
+    <button class="icon-btn" id="btnDownload" title="書き出し（バックアップ）">⬇</button>
+    <button class="icon-btn" id="btnUpload" title="読み込み（インポート）">⬆</button>
     <button class="icon-btn" id="btnDrive" title="Googleドライブ">☁</button>
   </div>
+  <input type="file" id="fileInput" accept=".json" style="display:none">
 </header>
 
 <div class="search-bar">
@@ -436,7 +438,32 @@ document.getElementById('btnDownload').addEventListener('click', () => {
   a.href = URL.createObjectURL(blob);
   a.download = `slothub_backup_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
-  toast('バックアップをダウンロードしました');
+  toast('書き出しました（スマホに送って⬆で読み込み）');
+});
+
+// ---- IMPORT ----
+document.getElementById('btnUpload').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (!Array.isArray(data)) { toast('ファイルの形式が正しくありません'); return; }
+      if (confirm(`${data.length}件のデータを読み込みます。現在のデータは上書きされます。よろしいですか？`)) {
+        sites = data;
+        save();
+        renderTabs();
+        renderCards();
+        toast(`${data.length}件を読み込みました`);
+      }
+    } catch { toast('ファイルの読み込みに失敗しました'); }
+    e.target.value = '';
+  };
+  reader.readAsText(file);
 });
 
 // ---- TOAST ----
