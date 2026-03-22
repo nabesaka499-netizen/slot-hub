@@ -133,6 +133,7 @@
 <header>
   <div class="logo">SLOT HUB<span>SITE MANAGER</span></div>
   <div class="actions">
+    <button class="icon-btn" id="btnShare" title="共有URLを作成">🔗</button>
     <button class="icon-btn" id="btnDownload" title="書き出し（バックアップ）">⬇</button>
     <button class="icon-btn" id="btnUpload" title="読み込み（インポート）">⬆</button>
     <button class="icon-btn" id="btnDrive" title="Googleドライブ">☁</button>
@@ -433,6 +434,38 @@ document.getElementById('editOverlay').addEventListener('click', e => { if (e.ta
 // ---- SEARCH ----
 document.getElementById('searchInput').addEventListener('input', renderCards);
 
+// ---- SHARE URL ----
+document.getElementById('btnShare').addEventListener('click', () => {
+  try {
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(sites))));
+    const url = `${location.origin}${location.pathname}#import=${encoded}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => toast('共有URLをコピーしました！LINEに貼り付けて送ってください'));
+    } else {
+      prompt('このURLをコピーしてLINEで送ってください', url);
+    }
+  } catch { toast('URLの生成に失敗しました'); }
+});
+
+// ---- IMPORT FROM URL ----
+function handleImportFromUrl() {
+  const hash = location.hash;
+  if (!hash.startsWith('#import=')) return;
+  try {
+    const encoded = hash.slice('#import='.length);
+    const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+    if (!Array.isArray(data)) return;
+    history.replaceState(null, '', location.pathname);
+    if (confirm(`${data.length}件のデータを受け取りました。読み込みますか？\n※現在のデータは上書きされます`)) {
+      sites = data;
+      save();
+      renderTabs();
+      renderCards();
+      toast(`${data.length}件を読み込みました`);
+    }
+  } catch { /* 無効なhashは無視 */ }
+}
+
 // ---- DOWNLOAD ----
 document.getElementById('btnDownload').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(sites, null, 2)], { type: 'application/json' });
@@ -601,6 +634,7 @@ if ('serviceWorker' in navigator) {
 
 // ---- INIT ----
 load();
+handleImportFromUrl();
 handleOAuthCallback();
 renderTabs();
 renderCards();
