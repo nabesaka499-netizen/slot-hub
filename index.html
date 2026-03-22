@@ -463,7 +463,13 @@ function renderDriveModal() {
   const formEl = document.getElementById('driveForm');
   if (driveConfig?.token) {
     statusEl.innerHTML = `<div class="g-status"><span class="icon">☁</span>接続中<br><small style="color:#4ade80">${driveConfig.email||''}</small></div>`;
-    formEl.innerHTML = `<button class="btn btn-disconnect" id="btnDisconnect">接続解除</button>`;
+    formEl.innerHTML = `
+      <button class="btn btn-save" id="btnDriveSync" style="width:100%;margin-bottom:8px">今すぐ同期（読み込み）</button>
+      <button class="btn btn-disconnect" id="btnDisconnect">接続解除</button>`;
+    document.getElementById('btnDriveSync').addEventListener('click', async () => {
+      toast('同期中...');
+      await driveLoad();
+    });
     document.getElementById('btnDisconnect').addEventListener('click', () => {
       driveConfig = null; localStorage.removeItem(DRIVE_KEY); renderDriveModal(); toast('接続を解除しました');
     });
@@ -482,13 +488,14 @@ function googleSignIn() {
   const clientId = document.getElementById('gClientId').value.trim();
   if (!clientId) { toast('Client IDを入力してください'); return; }
   driveConfig = { clientId };
+  localStorage.setItem(DRIVE_KEY, JSON.stringify(driveConfig));
   const redirect = location.href.split('?')[0];
   const scope = 'https://www.googleapis.com/auth/drive.appdata';
   const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirect)}&response_type=token&scope=${encodeURIComponent(scope)}`;
   window.location.href = url;
 }
 
-function handleOAuthCallback() {
+async function handleOAuthCallback() {
   const hash = location.hash;
   if (!hash.includes('access_token')) return;
   const params = new URLSearchParams(hash.slice(1));
@@ -498,23 +505,63 @@ function handleOAuthCallback() {
   driveConfig.expires = Date.now() + parseInt(params.get('expires_in') || 3600) * 1000;
   localStorage.setItem(DRIVE_KEY, JSON.stringify(driveConfig));
   history.replaceState(null, '', location.pathname);
-  toast('Googleドライブに接続しました');
-  driveSyncAuto();
+  toast('接続しました。データを読み込んでいます...');
+  // 接続直後にDriveからデータを読み込む
+  await driveLoad();
+}
+
+async function driveFileId() {
+  const res = await fetch(
+    `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name%3D'slothub_data.json'&fields=files(id)`,
+    { headers: { Authorization: 'Bearer ' + driveConfig.token } }
+  );
+  const json = await res.json();
+  return json.files?.[0]?.id || null;
+}
+
+async function driveLoad() {
+  if (!driveConfig?.token) return;
+  if (driveConfig.expires && Date.now() > driveConfig.expires) { driveConfig = null; localStorage.removeItem(DRIVE_KEY); return; }
+  try {
+    const fid = await driveFileId();
+    if (!fid) { toast('Driveにデータがありません'); return; }
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fid}?alt=media`,
+      { headers: { Authorization: 'Bearer ' + driveConfig.token } }
+    );
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      sites = data;
+      save();
+      renderTabs();
+      renderCards();
+      toast('Driveからデータを読み込みました');
+    }
+  } catch(e) { toast('読み込みに失敗しました'); }
 }
 
 async function driveSyncAuto() {
   if (!driveConfig?.token) return;
   if (driveConfig.expires && Date.now() > driveConfig.expires) { driveConfig = null; localStorage.removeItem(DRIVE_KEY); return; }
   try {
-    const data = JSON.stringify(sites);
-    const blob = new Blob([data], { type: 'application/json' });
-    const meta = JSON.stringify({ name: 'slothub_data.json', parents: ['appDataFolder'] });
-    const form = new FormData();
-    form.append('metadata', new Blob([meta], { type: 'application/json' }));
-    form.append('file', blob);
-    await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-      method: 'POST', headers: { Authorization: 'Bearer ' + driveConfig.token }, body: form
-    });
+    const fid = await driveFileId();
+    const blob = new Blob([JSON.stringify(sites)], { type: 'application/json' });
+    if (fid) {
+      // 既存ファイルを上書き
+      await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fid}?uploadType=media`,
+        { method: 'PATCH', headers: { Authorization: 'Bearer ' + driveConfig.token, 'Content-Type': 'application/json' }, body: blob }
+      );
+    } else {
+      // 新規作成
+      const meta = JSON.stringify({ name: 'slothub_data.json', parents: ['appDataFolder'] });
+      const form = new FormData();
+      form.append('metadata', new Blob([meta], { type: 'application/json' }));
+      form.append('file', blob);
+      await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + driveConfig.token }, body: form
+      });
+    }
   } catch(e) { /* silent */ }
 }
 
