@@ -14,6 +14,8 @@
   :root{
     --bg:#0f0f1a;--bg2:#1a1a2e;--bg3:#16213e;
     --accent:#e94560;--accent2:#f5a623;
+    --blue:#2563eb;--blue2:#60a5fa;
+    --red:#e94560;--red2:#f87171;
     --text:#eee;--text2:#aaa;
     --card:#1e1e35;--card-hover:#252540;
     --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.5);
@@ -52,18 +54,38 @@
   @media(max-width:380px){.grid{grid-template-columns:repeat(2,1fr)}}
 
   /* CARD */
-  .card{background:var(--card);border-radius:var(--radius);overflow:hidden;cursor:pointer;border:1px solid #ffffff10;transition:.2s;position:relative;display:flex;flex-direction:column}
-  .card:hover,.card:active{background:var(--card-hover);border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(233,69,96,.2)}
-  .card-thumb{height:90px;display:flex;align-items:center;justify-content:center;font-size:36px;background:linear-gradient(135deg,var(--bg3),var(--bg2))}
+  .card{background:var(--card);border-radius:var(--radius);overflow:hidden;cursor:pointer;border:1px solid #ffffff10;transition:.15s;position:relative;display:flex;flex-direction:column}
+  .card:hover,.card:active{background:var(--card-hover);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .card[data-cat="サブスク"]:hover{border-color:var(--blue);box-shadow:0 8px 24px rgba(37,99,235,.3)}
+  .card[data-cat="ノート"]:hover{border-color:var(--red);box-shadow:0 8px 24px rgba(233,69,96,.3)}
+
+  /* サムネイル色分け */
+  .card-thumb{height:90px;display:flex;align-items:center;justify-content:center;font-size:36px}
+  .card[data-cat="サブスク"] .card-thumb{background:linear-gradient(135deg,#1e3a8a,#2563eb)}
+  .card[data-cat="ノート"] .card-thumb{background:linear-gradient(135deg,#7f1d1d,#e94560)}
+  .card:not([data-cat]) .card-thumb{background:linear-gradient(135deg,var(--bg3),var(--bg2))}
+
   .card-body{padding:10px 12px;flex:1}
-  .card-name{font-size:13px;font-weight:600;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* タイトルを折り返して全表示 */
+  .card-name{font-size:13px;font-weight:600;margin-bottom:3px;word-break:break-all;white-space:normal;line-height:1.4}
   .card-desc{font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .card-tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;background:var(--accent);color:#fff;margin-top:5px;opacity:.85}
+
+  /* タグ色分け */
+  .card-tag{display:inline-block;font-size:10px;padding:2px 6px;border-radius:4px;color:#fff;margin-top:5px;opacity:.9}
+  .card-tag-サブスク{background:var(--blue)}
+  .card-tag-ノート{background:var(--red)}
+  .card-tag-other{background:#555}
+
   .card-actions{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:0;transition:.2s}
   .card:hover .card-actions{opacity:1}
   .card-act{background:rgba(0,0,0,.6);border:none;color:#fff;width:24px;height:24px;border-radius:5px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
   .card-act:hover{background:var(--accent)}
   .card-fav{position:absolute;top:6px;left:8px;font-size:14px;opacity:.7}
+
+  /* DRAG & DROP */
+  .card.dragging{opacity:.35;transform:scale(.96)}
+  .card.drag-over{outline:2px dashed var(--accent2);outline-offset:2px}
+  .drag-hint{text-align:center;font-size:11px;color:var(--text2);padding:6px 0 0;opacity:.6}
 
   /* FAB */
   .fab{position:fixed;bottom:24px;right:20px;width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:28px;border:none;cursor:pointer;box-shadow:0 6px 24px rgba(233,69,96,.5);display:flex;align-items:center;justify-content:center;z-index:200;transition:.2s}
@@ -131,7 +153,7 @@
     <h2 id="modalTitle">サイトを追加</h2>
     <div class="form-group">
       <label>サイト名 *</label>
-      <input type="text" id="fName" placeholder="例: ジャグラーの神様">
+      <input type="text" id="fName" placeholder="例: Netflix">
     </div>
     <div class="form-group">
       <label>URL *</label>
@@ -185,7 +207,6 @@ let sites = [];
 let activeTab = 'すべて';
 let editId = null;
 let driveConfig = null;
-let gapiReady = false;
 
 // ---- DATA ----
 function load() {
@@ -225,15 +246,28 @@ function filteredSites() {
   return list;
 }
 
+function tagClass(cat) {
+  if (cat === 'サブスク') return 'card-tag card-tag-サブスク';
+  if (cat === 'ノート') return 'card-tag card-tag-ノート';
+  return 'card-tag card-tag-other';
+}
+
 function renderCards() {
   const main = document.getElementById('main');
   const list = filteredSites();
+  const isSearching = document.getElementById('searchInput').value.trim() !== '';
+
   if (!list.length) {
-    main.innerHTML = `<div class="empty"><div class="icon">${sites.length?'🔍':'🎰'}</div><p>${sites.length?'一致するサイトが見つかりません':'「＋」ボタンでスロットサイトを追加しよう！'}</p></div>`;
+    main.innerHTML = `<div class="empty"><div class="icon">${sites.length?'🔍':'🎰'}</div><p>${sites.length?'一致するサイトが見つかりません':'「＋」ボタンでサイトを追加しよう！'}</p></div>`;
     return;
   }
-  main.innerHTML = `<div class="grid">${list.map(cardHTML).join('')}</div>`;
-  main.querySelectorAll('.card').forEach(el => {
+
+  const canDrag = !isSearching;
+  const hint = canDrag ? '<div class="drag-hint">ドラッグ＆ドロップで並び替え可能</div>' : '';
+  main.innerHTML = `<div class="grid" id="grid">${list.map(s => cardHTML(s, canDrag)).join('')}</div>${hint}`;
+
+  const grid = document.getElementById('grid');
+  grid.querySelectorAll('.card').forEach(el => {
     const id = el.dataset.id;
     el.addEventListener('click', e => {
       if (e.target.closest('.card-act')) return;
@@ -243,16 +277,18 @@ function renderCards() {
     el.querySelector('.card-act.edit')?.addEventListener('click', e => { e.stopPropagation(); openEdit(id); });
     el.querySelector('.card-act.del')?.addEventListener('click', e => { e.stopPropagation(); deleteSite(id); });
   });
+
+  if (canDrag) setupDragDrop(grid);
 }
 
-function cardHTML(s) {
-  return `<div class="card" data-id="${s.id}">
+function cardHTML(s, draggable) {
+  return `<div class="card" data-id="${s.id}" data-cat="${esc(s.cat)}"${draggable?' draggable="true"':''}>
     ${s.fav ? '<span class="card-fav">⭐</span>' : ''}
     <div class="card-thumb">${s.icon || '🎰'}</div>
     <div class="card-body">
       <div class="card-name">${esc(s.name)}</div>
       ${s.desc ? `<div class="card-desc">${esc(s.desc)}</div>` : ''}
-      <span class="card-tag">${esc(s.cat)}</span>
+      <span class="${tagClass(s.cat)}">${esc(s.cat)}</span>
     </div>
     <div class="card-actions">
       <button class="card-act edit" title="編集">✏</button>
@@ -262,6 +298,67 @@ function cardHTML(s) {
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ---- DRAG & DROP ----
+let dragSrcId = null;
+
+function setupDragDrop(grid) {
+  grid.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      dragSrcId = card.dataset.id;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      grid.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+    });
+    card.addEventListener('dragover', e => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      if (card.dataset.id !== dragSrcId) {
+        grid.querySelectorAll('.card').forEach(c => c.classList.remove('drag-over'));
+        card.classList.add('drag-over');
+      }
+    });
+    card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+    card.addEventListener('drop', e => {
+      e.preventDefault();
+      const targetId = card.dataset.id;
+      if (!dragSrcId || dragSrcId === targetId) return;
+      card.classList.remove('drag-over');
+
+      // フィルタ済みリストの順序を取得してsites配列に反映
+      const filtered = filteredSites();
+      const srcIdx = filtered.findIndex(s => s.id === dragSrcId);
+      const tgtIdx = filtered.findIndex(s => s.id === targetId);
+      if (srcIdx < 0 || tgtIdx < 0) return;
+
+      // filtered内で移動
+      const [moved] = filtered.splice(srcIdx, 1);
+      filtered.splice(tgtIdx, 0, moved);
+
+      // filteredのIDリストを新しい順序として、sitesを再構築
+      const filteredIds = filtered.map(s => s.id);
+      const others = sites.filter(s => !filteredIds.includes(s.id));
+      // filteredのアイテムはfilteredの順で、それ以外はotherとして最後に付ける
+      // sitesの元の位置を維持しつつfilteredの順序だけ変える
+      const newSites = [];
+      const filteredMap = new Map(filtered.map(s => [s.id, s]));
+      let fi = 0;
+      for (const s of sites) {
+        if (filteredMap.has(s.id)) {
+          newSites.push(filtered[fi++]);
+        } else {
+          newSites.push(s);
+        }
+      }
+      sites = newSites;
+      save();
+      renderCards();
+    });
+  });
+}
 
 // ---- EDIT MODAL ----
 function buildEmojiRow(selected) {
@@ -281,7 +378,7 @@ function openAdd() {
   document.getElementById('fName').value = '';
   document.getElementById('fUrl').value = '';
   document.getElementById('fDesc').value = '';
-  document.getElementById('fCat').value = '攻略';
+  document.getElementById('fCat').value = 'サブスク';
   document.getElementById('fFav').checked = false;
   buildEmojiRow('🎰');
   document.getElementById('editOverlay').classList.add('show');
