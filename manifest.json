@@ -1,0 +1,21 @@
+{
+  "name": "SLOT HUB",
+  "short_name": "SLOT HUB",
+  "description": "スロットサイト一元管理アプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#e94560",
+  "icons": [
+    {
+      "src": "https://via.placeholder.com/192x192/e94560/ffffff?text=SH",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://via.placeholder.com/512x512/e94560/ffffff?text=SH",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
