@@ -201,6 +201,19 @@
   </div>
 </div>
 
+<!-- IMPORT CONFIRM MODAL -->
+<div class="overlay" id="importOverlay">
+  <div class="modal" style="text-align:center">
+    <div style="font-size:40px;margin-bottom:12px">📥</div>
+    <h2 id="importMsg">データを受け取りました</h2>
+    <p style="font-size:13px;color:var(--text2);margin-top:8px">現在のデータは上書きされます</p>
+    <div class="modal-btns" style="margin-top:20px">
+      <button class="btn btn-cancel" id="btnImportCancel">キャンセル</button>
+      <button class="btn btn-save" id="btnImportOk">読み込む</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -420,11 +433,38 @@ document.getElementById('btnSave').addEventListener('click', () => {
   toast(editId ? 'サイトを更新しました' : 'サイトを追加しました');
 });
 
+let pendingDeleteId = null;
 function deleteSite(id) {
-  if (!confirm('このサイトを削除しますか？')) return;
-  sites = sites.filter(x => x.id !== id);
-  save(); renderTabs(); renderCards();
-  toast('削除しました');
+  pendingDeleteId = id;
+  document.getElementById('importMsg').textContent = 'このサイトを削除しますか？';
+  document.getElementById('btnImportOk').textContent = '削除';
+  document.getElementById('importOverlay').classList.add('show');
+}
+
+// インポート・削除 共通ダイアログ
+document.getElementById('btnImportOk').addEventListener('click', () => {
+  if (pendingImportData) {
+    sites = pendingImportData;
+    pendingImportData = null;
+    closeImportModal('読み込む');
+    save(); renderTabs(); renderCards();
+    toast('読み込みました');
+  } else if (pendingDeleteId) {
+    sites = sites.filter(x => x.id !== pendingDeleteId);
+    pendingDeleteId = null;
+    closeImportModal('読み込む');
+    save(); renderTabs(); renderCards();
+    toast('削除しました');
+  }
+});
+document.getElementById('btnImportCancel').addEventListener('click', () => {
+  pendingImportData = null;
+  pendingDeleteId = null;
+  closeImportModal('読み込む');
+});
+function closeImportModal(okLabel) {
+  document.getElementById('importOverlay').classList.remove('show');
+  document.getElementById('btnImportOk').textContent = okLabel;
 }
 
 document.getElementById('fabAdd').addEventListener('click', openAdd);
@@ -448,6 +488,8 @@ document.getElementById('btnShare').addEventListener('click', () => {
 });
 
 // ---- IMPORT FROM URL ----
+let pendingImportData = null;
+
 function handleImportFromUrl() {
   const params = new URLSearchParams(location.search);
   const encoded = params.get('import');
@@ -456,13 +498,9 @@ function handleImportFromUrl() {
     const data = JSON.parse(decodeURIComponent(escape(atob(encoded))));
     if (!Array.isArray(data)) return;
     history.replaceState(null, '', location.pathname);
-    if (confirm(`${data.length}件のデータを受け取りました。読み込みますか？\n※現在のデータは上書きされます`)) {
-      sites = data;
-      save();
-      renderTabs();
-      renderCards();
-      toast(`${data.length}件を読み込みました`);
-    }
+    pendingImportData = data;
+    document.getElementById('importMsg').textContent = `${data.length}件のデータを受け取りました`;
+    document.getElementById('importOverlay').classList.add('show');
   } catch { /* 無効なパラメータは無視 */ }
 }
 
@@ -488,13 +526,10 @@ document.getElementById('fileInput').addEventListener('change', e => {
     try {
       const data = JSON.parse(ev.target.result);
       if (!Array.isArray(data)) { toast('ファイルの形式が正しくありません'); return; }
-      if (confirm(`${data.length}件のデータを読み込みます。現在のデータは上書きされます。よろしいですか？`)) {
-        sites = data;
-        save();
-        renderTabs();
-        renderCards();
-        toast(`${data.length}件を読み込みました`);
-      }
+      pendingImportData = data;
+      document.getElementById('importMsg').textContent = `${data.length}件のデータを読み込みます`;
+      document.getElementById('btnImportOk').textContent = '読み込む';
+      document.getElementById('importOverlay').classList.add('show');
     } catch { toast('ファイルの読み込みに失敗しました'); }
     e.target.value = '';
   };
